@@ -1,33 +1,88 @@
-// The Vue build version to load with the `import` command
-// (runtime-only or standalone) has been set in webpack.base.conf with an alias.
+// Import ES6 Promise
+import 'es6-promise/auto'
+
+// Import System requirements
 import Vue from 'vue'
-import App from './App'
-import VueResource from 'vue-resource'
+import VueRouter from 'vue-router'
+
+import { sync } from 'vuex-router-sync'
+import routes from './routes'
+import store from './store'
 import axios from 'axios'
 import VueAxios from 'vue-axios'
-import VueGoodTable from 'vue-good-table';
-import * as VueGoogleMaps from "vue2-google-maps";
+import VueGoodTable from 'vue-good-table'
+import * as VueGoogleMaps from 'vue2-google-maps'
 
+// Import Helpers for filters
+import { domain, count, prettyDate, pluralize } from './filters'
 
+// Import Views - Top level
+import AppView from './components/App.vue'
 
+// Import Install and register helper items
+Vue.filter('count', count)
+Vue.filter('domain', domain)
+Vue.filter('prettyDate', prettyDate)
+Vue.filter('pluralize', pluralize)
+
+Vue.use(VueRouter)
 Vue.use(VueGoogleMaps, {
   load: {
-    key: "AIzaSyAyCEzPjAsjYJhqnH3Dug9FyWrw6QXXmhs",
-    v: "3.30"
+    key: 'AIzaSyAyCEzPjAsjYJhqnH3Dug9FyWrw6QXXmhs',
+    v: '3.30'
     // libraries: 'places', //// If you need to use place input
   }
-});
+})
 
-Vue.use(VueGoodTable); 
+Vue.use(VueGoodTable)
 
 Vue.use(VueAxios, axios)
 // Vue.use(VueResource)
 Vue.config.productionTip = false
 
+// Routing logic
+var router = new VueRouter({
+  routes: routes,
+  mode: 'history',
+  linkExactActiveClass: 'active',
+  scrollBehavior: function (to, from, savedPosition) {
+    return savedPosition || { x: 0, y: 0 }
+  }
+})
 
-/* eslint-disable no-new */
+// Some middleware to help us ensure the user is authenticated.
+router.beforeEach((to, from, next) => {
+  if (to.matched.some(record => record.meta.requiresAuth) && (!router.app.$store.state.token || router.app.$store.state.token === 'null')) {
+    // this route requires auth, check if logged in
+    // if not, redirect to login page.
+    window.console.log('Not authenticated')
+    next({
+      path: '/login',
+      query: { redirect: to.fullPath }
+    })
+  } else {
+    next()
+  }
+})
+
+sync(store, router)
+
+// Check local storage to handle refreshes
+if (window.localStorage) {
+  var localUserString = window.localStorage.getItem('user') || 'null'
+  var localUser = JSON.parse(localUserString)
+
+  if (localUser && store.state.user !== localUser) {
+    store.commit('SET_USER', localUser)
+    store.commit('SET_TOKEN', window.localStorage.getItem('token'))
+  }
+}
+
+// Start out app!
+// eslint-disable-next-line no-new
 new Vue({
-  el: '#app',
-  template: '<App/>',
-  components: { App }
+  el: '#root',
+  router: router,
+  store: store,
+  render: h => h(AppView)
 })
